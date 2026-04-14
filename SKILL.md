@@ -296,6 +296,125 @@ Phase 1을 재실행하여 조치 결과를 확인한다.
 
 ---
 
+## Phase 6: Git 커밋 + Push + 서버 배포 안내
+
+Phase 1~5에서 생성/수정된 파일을 Git에 반영하고, 서버 배포 방법을 안내한다.
+
+### 6-1. Git 상태 확인
+
+```bash
+git remote -v    # remote 설정 여부 확인
+git status       # 변경/생성된 파일 목록
+```
+
+### 6-2. 분기: Git remote가 있는 경우
+
+이미 GitHub/GitLab 등에 연결된 프로젝트면 자동으로 커밋 + push:
+
+```bash
+git add Dockerfile docker-compose.yml .dockerignore nginx/ scripts/ \
+       .gitignore .env.production.example .streamlit/ _workspace/
+git commit -m "chore: deploy-security 보안 점검 + 배포 스크립트 생성"
+git push origin main
+```
+
+완료 후 사용자에게 안내:
+```
+✅ Git push 완료!
+
+서버에서 아래 3단계만 실행하면 배포됩니다:
+
+  1. git clone {감지된 remote URL}
+  2. cd {프로젝트명}
+  3. bash scripts/deploy.sh
+
+  이후 클라우드 콘솔에서 포트 80을 열어주세요.
+```
+
+### 6-3. 분기: Git remote가 없는 경우
+
+Git 초기화가 안 된 프로젝트면 상세 안내를 출력:
+
+```
+⚠ Git 원격 저장소가 설정되어 있지 않습니다.
+
+아래 순서로 저장소를 만들고 코드를 올려주세요:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. GitHub/GitLab에서 저장소 생성
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  [GitHub] https://github.com/new
+    → Repository name: {프로젝트명}
+    → Private 선택 (보안 코드 포함)
+    → Create repository
+
+  [GitLab] https://gitlab.com/projects/new
+    → Project name: {프로젝트명}
+    → Visibility Level: Private
+    → Create project
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. 로컬에서 Git 초기화 + Push
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  git init
+  git add .
+  git commit -m "초기 커밋 + deploy-security 보안 점검"
+  git remote add origin https://github.com/{사용자명}/{프로젝트명}.git
+  git branch -M main
+  git push -u origin main
+
+  ※ GitHub: 사용자명/비밀번호 대신 Personal Access Token 사용
+    발급: https://github.com/settings/tokens → repo 권한 체크
+
+  ※ GitLab: 비밀번호 또는 Personal Access Token 사용
+    발급: https://gitlab.com/-/user_settings/personal_access_tokens
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. 서버에서 배포
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  서버에 SSH 접속 후:
+
+  git clone https://github.com/{사용자명}/{프로젝트명}.git
+  cd {프로젝트명}
+  bash scripts/deploy.sh
+
+  ※ Private 저장소면 clone 시 사용자명/토큰 입력 필요
+  ※ 토큰을 URL에 넣지 마세요 (터미널에서 줄바꿈 문제 발생)
+     → git clone 후 프롬프트에서 입력하는 게 안전합니다
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4. 클라우드 보안 규칙에서 포트 80 열기
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  OCI : Networking → VCN → Security List → Ingress Rules → TCP 80
+  AWS : EC2 → Security Groups → Inbound Rules → TCP 80
+  NCP : Server → ACG → Inbound Rules → TCP 80
+  GCP : VPC Network → Firewall → Create Rule → tcp:80
+
+  ※ 방화벽은 클라우드 콘솔 + 서버 OS 양쪽 다 열어야 합니다
+     (deploy.sh가 OS 방화벽은 자동 처리하지만, 클라우드 콘솔은 수동)
+```
+
+### 6-4. Git에 올리면 안 되는 파일 확인
+
+Push 전에 `.gitignore`가 다음을 포함하는지 검증:
+- `.env` (시크릿 포함)
+- `venv/`, `node_modules/` (의존성)
+- `*.pem`, `*.key` (인증서)
+- 프로젝트 특화 데이터 디렉토리
+
+누락 시 자동 추가 후 경고:
+```
+⚠ .gitignore에 .env가 없어서 추가했습니다.
+   .env 파일이 Git 이력에 이미 포함되어 있다면:
+   git rm --cached .env && git commit -m "remove .env from tracking"
+```
+
+---
+
 ## 산출물
 
 ```
